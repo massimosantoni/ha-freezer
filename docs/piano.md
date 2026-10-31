@@ -1,6 +1,6 @@
 # Inventario freezer in Home Assistant — analisi e piano
 
-_Stato: approvato, in sviluppo (Fase 1) — 31/10/2026_
+_Stato: approvato, Fasi 1–2 completate — 31/10/2026_
 
 ## 1. Requisiti (dalla richiesta)
 
@@ -92,6 +92,9 @@ freezer-inventory/                       # repo GitHub (pubblico: HACS non gesti
 ```
 
 - La card sta **dentro** il pacchetto dell'integrazione: una sola installazione HACS, una sola versione.
+- Repo: `github.com/massimosantoni/ha-freezer`, dominio `freezer_inventory`.
+- Websocket e servizi aperti a tutti gli utenti autenticati (anche non admin), testato.
+- Storage illeggibile → entry in errore, file lasciato intatto (mai sovrascritto con un inventario vuoto).
 - **Persistenza**: `homeassistant.helpers.storage.Store` → `/config/.storage/freezer_inventory.<entry_id>`. Inclusa nei backup di HA.
 - **Card auto-registrata**: `hass.http.async_register_static_paths([StaticPathConfig("/freezer_inventory/card.js", ...)])` + `frontend.add_extra_js_url(hass, url + "?v=<version>")` (il parametro versione evita la cache vecchia dopo un aggiornamento).
 - **Aggiornamento live**: websocket `freezer_inventory/subscribe` che invia la lista completa a ogni modifica.
@@ -174,11 +177,11 @@ freezer-inventory/                       # repo GitHub (pubblico: HACS non gesti
 
 | Fase | Contenuto | Stato |
 |---|---|---|
-| 1 | `inventory.py` + test pytest puri | in corso |
-| 2 | `__init__`, config flow, servizi, websocket, sensori; test con `pytest-homeassistant-custom-component` | |
+| 1 | `inventory.py` + test pytest puri | ✅ 55 test |
+| 2 | `__init__`, config flow, servizi, websocket, sensori; test con `pytest-homeassistant-custom-component` | ✅ 21 test (HA 2026.2.3 in locale; CI su ultima HA) — card provvisoria in sola lettura |
 | 3 | Card: lista, sort/filtri, +/-, sheet prelievo, toast undo | |
 | 4 | Dialog aggiungi/modifica, autocompletamento, età colorata, traduzioni | |
-| 5 | Repo GitHub, `hacs.json`, workflow CI (hassfest, HACS validation, pytest), prima release `v0.1.0`; installazione come custom repository HACS; vista dashboard + tag NFC | |
+| 5 | Repo GitHub, `hacs.json`, workflow CI (hassfest, HACS validation, pytest), prima release `v0.1.0`; installazione come custom repository HACS; vista dashboard + tag NFC | packaging e CI pronti; release da fare |
 | 6 (extra) | Intent Assist, export CSV, notifiche età | |
 
 Note di deploy:

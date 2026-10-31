@@ -1,0 +1,241 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Freezer Inventory",
+        "description": "Inventario del freezer, voce per voce e pezzo per pezzo.",
+        "data": {
+          "name": "Nome del freezer"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "È già configurato un freezer."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "total": {
+        "name": "Pezzi totali",
+        "state_attributes": {
+          "items": {
+            "name": "Voci"
+          },
+          "total_weight_g": {
+            "name": "Peso totale noto (g)"
+          },
+          "oldest_added_at": {
+            "name": "Pezzo più vecchio"
+          }
+        }
+      },
+      "carne": {
+        "name": "Carne",
+        "state_attributes": {
+          "items": {
+            "name": "Voci"
+          }
+        }
+      },
+      "verdura": {
+        "name": "Verdura",
+        "state_attributes": {
+          "items": {
+            "name": "Voci"
+          }
+        }
+      },
+      "frutta": {
+        "name": "Frutta",
+        "state_attributes": {
+          "items": {
+            "name": "Voci"
+          }
+        }
+      },
+      "altro": {
+        "name": "Altro",
+        "state_attributes": {
+          "items": {
+            "name": "Voci"
+          }
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "invalid_name": {
+      "message": "Il nome deve avere tra 2 e 80 caratteri."
+    },
+    "invalid_category": {
+      "message": "Categoria non valida: usa carne, verdura, frutta o altro."
+    },
+    "invalid_note": {
+      "message": "La nota non può superare i 500 caratteri."
+    },
+    "invalid_weight": {
+      "message": "Peso non valido: usa grammi o kg tra 1 g e 50 kg (es. «200 300 0,5kg»)."
+    },
+    "invalid_quantity": {
+      "message": "La quantità deve essere tra 1 e 50."
+    },
+    "quantity_weights_mismatch": {
+      "message": "Quantità {quantity} diversa dal numero di pesi indicati ({weights})."
+    },
+    "item_not_found": {
+      "message": "Voce non trovata (forse già prelevata o eliminata)."
+    },
+    "piece_not_found": {
+      "message": "Pezzo non trovato (forse già prelevato)."
+    },
+    "empty_pieces": {
+      "message": "Una voce deve avere almeno un pezzo: per toglierla usa «Elimina voce»."
+    },
+    "invalid_piece": {
+      "message": "Elenco pezzi non valido."
+    },
+    "invalid_date": {
+      "message": "Data non valida."
+    },
+    "nothing_to_undo": {
+      "message": "Non c'è nulla da annullare."
+    },
+    "invalid_sort": {
+      "message": "Ordinamento non valido."
+    },
+    "not_loaded": {
+      "message": "Freezer Inventory non è attivo."
+    }
+  },
+  "selector": {
+    "category": {
+      "options": {
+        "carne": "Carne",
+        "verdura": "Verdura",
+        "frutta": "Frutta",
+        "altro": "Altro"
+      }
+    },
+    "sort": {
+      "options": {
+        "date": "Data (pezzo più vecchio)",
+        "category": "Categoria",
+        "name": "Nome"
+      }
+    }
+  },
+  "services": {
+    "add_item": {
+      "name": "Aggiungi voce",
+      "description": "Aggiunge una nuova voce al freezer. Crea sempre una voce nuova, anche se il nome esiste già.",
+      "fields": {
+        "name": {
+          "name": "Nome",
+          "description": "Nome o breve descrizione."
+        },
+        "category": {
+          "name": "Categoria",
+          "description": "Carne, verdura, frutta o altro."
+        },
+        "quantity": {
+          "name": "Quantità",
+          "description": "Numero di pezzi senza peso (ignorato se indichi i pesi)."
+        },
+        "weights": {
+          "name": "Pesi",
+          "description": "Facoltativo: un peso per pezzo, es. «200 300 0,5kg»."
+        },
+        "note": {
+          "name": "Nota",
+          "description": "Nota libera facoltativa."
+        }
+      }
+    },
+    "add_piece": {
+      "name": "Aggiungi pezzo",
+      "description": "Aggiunge un pezzo a una voce esistente, con la data di oggi.",
+      "fields": {
+        "item_id": {
+          "name": "ID voce",
+          "description": "Identificativo della voce."
+        },
+        "weight_g": {
+          "name": "Peso",
+          "description": "Peso facoltativo in grammi."
+        }
+      }
+    },
+    "take_piece": {
+      "name": "Preleva pezzo",
+      "description": "Toglie un pezzo; senza ID pezzo toglie il più vecchio. All'ultimo pezzo la voce viene eliminata.",
+      "fields": {
+        "item_id": {
+          "name": "ID voce",
+          "description": "Identificativo della voce."
+        },
+        "piece_id": {
+          "name": "ID pezzo",
+          "description": "Facoltativo: il pezzo da prelevare."
+        }
+      }
+    },
+    "update_item": {
+      "name": "Modifica voce",
+      "description": "Corregge nome, categoria, nota o l'elenco dei pezzi.",
+      "fields": {
+        "item_id": {
+          "name": "ID voce",
+          "description": "Identificativo della voce."
+        },
+        "name": {
+          "name": "Nome",
+          "description": "Nuovo nome."
+        },
+        "category": {
+          "name": "Categoria",
+          "description": "Nuova categoria."
+        },
+        "note": {
+          "name": "Nota",
+          "description": "Nuova nota (vuota per cancellarla)."
+        },
+        "pieces": {
+          "name": "Pezzi",
+          "description": "Sostituisce l'elenco: pezzi con «id» vengono aggiornati, senza «id» vengono creati, quelli non elencati rimossi."
+        }
+      }
+    },
+    "delete_item": {
+      "name": "Elimina voce",
+      "description": "Elimina una voce con tutti i suoi pezzi.",
+      "fields": {
+        "item_id": {
+          "name": "ID voce",
+          "description": "Identificativo della voce."
+        }
+      }
+    },
+    "undo_last": {
+      "name": "Annulla ultima operazione",
+      "description": "Annulla l'ultima operazione non ancora annullata."
+    },
+    "list_items": {
+      "name": "Elenca voci",
+      "description": "Restituisce le voci, filtrate e ordinate.",
+      "fields": {
+        "category": {
+          "name": "Categoria",
+          "description": "Facoltativo: solo questa categoria."
+        },
+        "sort": {
+          "name": "Ordinamento",
+          "description": "Data, categoria o nome."
+        },
+        "descending": {
+          "name": "Decrescente",
+          "description": "Inverte l'ordinamento principale."
+        }
+      }
+    }
+  }
+}

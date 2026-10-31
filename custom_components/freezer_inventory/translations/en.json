@@ -1,0 +1,241 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Freezer Inventory",
+        "description": "Freezer inventory, item by item and piece by piece.",
+        "data": {
+          "name": "Freezer name"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "A freezer is already configured."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "total": {
+        "name": "Total pieces",
+        "state_attributes": {
+          "items": {
+            "name": "Items"
+          },
+          "total_weight_g": {
+            "name": "Known total weight (g)"
+          },
+          "oldest_added_at": {
+            "name": "Oldest piece"
+          }
+        }
+      },
+      "carne": {
+        "name": "Meat",
+        "state_attributes": {
+          "items": {
+            "name": "Items"
+          }
+        }
+      },
+      "verdura": {
+        "name": "Vegetables",
+        "state_attributes": {
+          "items": {
+            "name": "Items"
+          }
+        }
+      },
+      "frutta": {
+        "name": "Fruit",
+        "state_attributes": {
+          "items": {
+            "name": "Items"
+          }
+        }
+      },
+      "altro": {
+        "name": "Other",
+        "state_attributes": {
+          "items": {
+            "name": "Items"
+          }
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "invalid_name": {
+      "message": "The name must be 2 to 80 characters long."
+    },
+    "invalid_category": {
+      "message": "Invalid category: use carne, verdura, frutta or altro."
+    },
+    "invalid_note": {
+      "message": "The note cannot exceed 500 characters."
+    },
+    "invalid_weight": {
+      "message": "Invalid weight: use grams or kg between 1 g and 50 kg (e.g. \"200 300 0.5kg\")."
+    },
+    "invalid_quantity": {
+      "message": "Quantity must be between 1 and 50."
+    },
+    "quantity_weights_mismatch": {
+      "message": "Quantity {quantity} does not match the number of weights ({weights})."
+    },
+    "item_not_found": {
+      "message": "Item not found (maybe already taken or deleted)."
+    },
+    "piece_not_found": {
+      "message": "Piece not found (maybe already taken)."
+    },
+    "empty_pieces": {
+      "message": "An item needs at least one piece: use \"Delete item\" to remove it."
+    },
+    "invalid_piece": {
+      "message": "Invalid piece list."
+    },
+    "invalid_date": {
+      "message": "Invalid date."
+    },
+    "nothing_to_undo": {
+      "message": "Nothing to undo."
+    },
+    "invalid_sort": {
+      "message": "Invalid sort order."
+    },
+    "not_loaded": {
+      "message": "Freezer Inventory is not loaded."
+    }
+  },
+  "selector": {
+    "category": {
+      "options": {
+        "carne": "Meat",
+        "verdura": "Vegetables",
+        "frutta": "Fruit",
+        "altro": "Other"
+      }
+    },
+    "sort": {
+      "options": {
+        "date": "Date (oldest piece)",
+        "category": "Category",
+        "name": "Name"
+      }
+    }
+  },
+  "services": {
+    "add_item": {
+      "name": "Add item",
+      "description": "Adds a new item to the freezer. Always creates a new item, even if the name already exists.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name or short description."
+        },
+        "category": {
+          "name": "Category",
+          "description": "Meat, vegetables, fruit or other."
+        },
+        "quantity": {
+          "name": "Quantity",
+          "description": "Number of pieces without weight (ignored if weights are given)."
+        },
+        "weights": {
+          "name": "Weights",
+          "description": "Optional: one weight per piece, e.g. \"200 300 0.5kg\"."
+        },
+        "note": {
+          "name": "Note",
+          "description": "Optional free note."
+        }
+      }
+    },
+    "add_piece": {
+      "name": "Add piece",
+      "description": "Adds a piece to an existing item, dated today.",
+      "fields": {
+        "item_id": {
+          "name": "Item ID",
+          "description": "Item identifier."
+        },
+        "weight_g": {
+          "name": "Weight",
+          "description": "Optional weight in grams."
+        }
+      }
+    },
+    "take_piece": {
+      "name": "Take piece",
+      "description": "Removes a piece; without a piece ID the oldest is taken. Taking the last piece deletes the item.",
+      "fields": {
+        "item_id": {
+          "name": "Item ID",
+          "description": "Item identifier."
+        },
+        "piece_id": {
+          "name": "Piece ID",
+          "description": "Optional: the piece to take."
+        }
+      }
+    },
+    "update_item": {
+      "name": "Update item",
+      "description": "Fixes name, category, note or the piece list.",
+      "fields": {
+        "item_id": {
+          "name": "Item ID",
+          "description": "Item identifier."
+        },
+        "name": {
+          "name": "Name",
+          "description": "New name."
+        },
+        "category": {
+          "name": "Category",
+          "description": "New category."
+        },
+        "note": {
+          "name": "Note",
+          "description": "New note (empty to clear)."
+        },
+        "pieces": {
+          "name": "Pieces",
+          "description": "Replaces the list: pieces with \"id\" are updated, without \"id\" are created, unlisted ones are removed."
+        }
+      }
+    },
+    "delete_item": {
+      "name": "Delete item",
+      "description": "Deletes an item with all its pieces.",
+      "fields": {
+        "item_id": {
+          "name": "Item ID",
+          "description": "Item identifier."
+        }
+      }
+    },
+    "undo_last": {
+      "name": "Undo last operation",
+      "description": "Reverts the most recent operation not yet undone."
+    },
+    "list_items": {
+      "name": "List items",
+      "description": "Returns the items, filtered and sorted.",
+      "fields": {
+        "category": {
+          "name": "Category",
+          "description": "Optional: only this category."
+        },
+        "sort": {
+          "name": "Sort",
+          "description": "Date, category or name."
+        },
+        "descending": {
+          "name": "Descending",
+          "description": "Reverses the primary sort order."
+        }
+      }
+    }
+  }
+}

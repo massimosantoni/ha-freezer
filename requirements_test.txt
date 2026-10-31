@@ -1,0 +1,4 @@
+# Pulls the matching homeassistant release; unpinned so CI follows the latest HA.
+pytest-homeassistant-custom-component
+home-assistant-frontend
+ruff

@@ -5,7 +5,7 @@ from datetime import datetime
 
 import pytest
 
-from conftest import TZ, const_mod, inventory_mod
+from pure_support import TZ, const_mod, inventory_mod
 
 Inventory = inventory_mod.Inventory
 InventoryError = inventory_mod.InventoryError
@@ -20,6 +20,7 @@ def err_code(excinfo) -> str:
 # Parsing / validation
 # --------------------------------------------------------------------------- #
 
+
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
@@ -27,11 +28,11 @@ def err_code(excinfo) -> str:
         ("200, 300; 500", [200, 300, 500]),
         ("200g 300 gr", [200, 300]),
         ("0,5kg", [500]),
-        ("0,5", [500]),          # bare number < 10 → kg
+        ("0,5", [500]),  # bare number < 10 → kg
         ("1.2 kg", [1200]),
         ("1,5 KG", [1500]),
         ("3hg", [300]),
-        ("1.200", [1200]),       # Italian thousands separator reads right by luck of the rule
+        ("1.200", [1200]),  # Italian thousands separator reads right by luck of the rule
         ("250/250+250", [250, 250, 250]),
         ("", []),
         ("   ", []),
@@ -73,6 +74,7 @@ def test_invalid_category_and_note(inv):
 # --------------------------------------------------------------------------- #
 # add_item / add_piece
 # --------------------------------------------------------------------------- #
+
 
 def test_add_item_default_one_piece_without_weight(inv, clock):
     item = inv.add_item("Piselli surgelati", "verdura", user="Max")
@@ -144,6 +146,7 @@ def test_add_piece_unknown_item(inv):
 # take_piece
 # --------------------------------------------------------------------------- #
 
+
 def test_take_default_is_oldest(inv, clock):
     item = inv.add_item("Bistecche", "carne", weights=[500])
     clock.advance(days=3)
@@ -182,6 +185,7 @@ def test_take_last_piece_deletes_item(inv):
 # update_item / delete_item
 # --------------------------------------------------------------------------- #
 
+
 def test_update_fields(inv, clock):
     item = inv.add_item("Fragole", "verdura")
     clock.advance(hours=1)
@@ -204,13 +208,13 @@ def test_update_pieces_replace(inv, clock):
     inv.update_item(
         item.id,
         pieces=[
-            {"id": p200.id, "weight_g": 220},                      # weight fix, date kept
+            {"id": p200.id, "weight_g": 220},  # weight fix, date kept
             {"id": p300.id, "weight_g": None, "added_at": custom_date.isoformat()},
-            {"weight_g": 400},                                      # new piece, now
-        ],                                                          # p500 dropped
+            {"weight_g": 400},  # new piece, now
+        ],  # p500 dropped
     )
     assert [(p.id, p.weight_g) for p in item.pieces] == [
-        (p300.id, None),          # sorted: 1 Oct first
+        (p300.id, None),  # sorted: 1 Oct first
         (p200.id, 220),
         (item.pieces[2].id, 400),
     ]
@@ -257,6 +261,7 @@ def test_delete_item(inv):
 # undo
 # --------------------------------------------------------------------------- #
 
+
 def test_undo_each_action(inv):
     item = inv.add_item("Bistecche", "carne", weights=[200, 300])
     snap_after_add = item.to_dict()
@@ -298,13 +303,13 @@ def test_undo_restores_deleted_by_last_take(inv):
 
 def test_undo_stack_after_new_operation(inv):
     a = inv.add_item("A cosa", "altro", quantity=3)
-    inv.take_piece(a.id)          # op1
-    inv.take_piece(a.id)          # op2
-    inv.undo_last()               # undo op2 → 2 pieces
-    inv.take_piece(a.id)          # op3 → 1 piece
-    inv.undo_last()               # undo op3 → 2 pieces
+    inv.take_piece(a.id)  # op1
+    inv.take_piece(a.id)  # op2
+    inv.undo_last()  # undo op2 → 2 pieces
+    inv.take_piece(a.id)  # op3 → 1 piece
+    inv.undo_last()  # undo op3 → 2 pieces
     assert inv.items[a.id].quantity == 2
-    inv.undo_last()               # skips op2 (undone), undoes op1 → 3 pieces
+    inv.undo_last()  # skips op2 (undone), undoes op1 → 3 pieces
     assert inv.items[a.id].quantity == 3
 
 
@@ -328,18 +333,19 @@ def test_log_is_bounded(inv):
 # queries
 # --------------------------------------------------------------------------- #
 
+
 @pytest.fixture
 def stocked(inv, clock):
     names = {}
-    names["sugo"] = inv.add_item("Sugo", "altro")            # day 0
+    names["sugo"] = inv.add_item("Sugo", "altro")  # day 0
     clock.advance(days=1)
-    names["piselli"] = inv.add_item("piselli", "verdura")    # day 1
+    names["piselli"] = inv.add_item("piselli", "verdura")  # day 1
     clock.advance(days=1)
     names["bistecche"] = inv.add_item("Bistecche", "carne")  # day 2
     clock.advance(days=1)
-    names["fragole"] = inv.add_item("Fragole", "frutta")     # day 3
+    names["fragole"] = inv.add_item("Fragole", "frutta")  # day 3
     clock.advance(days=1)
-    names["arista"] = inv.add_item("Arista", "carne")        # day 4
+    names["arista"] = inv.add_item("Arista", "carne")  # day 4
     # an old piece makes "fragole" the oldest item
     inv.update_item(
         names["fragole"].id,
@@ -354,21 +360,15 @@ def _names(items):
 
 def test_sort_by_date_uses_oldest_piece(inv, stocked):
     assert _names(inv.list_items()) == ["Fragole", "Sugo", "piselli", "Bistecche", "Arista"]
-    assert _names(inv.list_items(descending=True)) == [
-        "Arista", "Bistecche", "piselli", "Sugo", "Fragole"
-    ]
+    assert _names(inv.list_items(descending=True)) == ["Arista", "Bistecche", "piselli", "Sugo", "Fragole"]
 
 
 def test_sort_by_category_then_date(inv, stocked):
-    assert _names(inv.list_items(sort="category")) == [
-        "Bistecche", "Arista", "piselli", "Fragole", "Sugo"
-    ]
+    assert _names(inv.list_items(sort="category")) == ["Bistecche", "Arista", "piselli", "Fragole", "Sugo"]
 
 
 def test_sort_by_name_case_insensitive(inv, stocked):
-    assert _names(inv.list_items(sort="name")) == [
-        "Arista", "Bistecche", "Fragole", "piselli", "Sugo"
-    ]
+    assert _names(inv.list_items(sort="name")) == ["Arista", "Bistecche", "Fragole", "piselli", "Sugo"]
 
 
 def test_filter_category(inv, stocked):

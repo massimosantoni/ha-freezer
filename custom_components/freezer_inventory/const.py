@@ -25,3 +25,10 @@ SORT_DATE: Final = "date"
 SORT_CATEGORY: Final = "category"
 SORT_NAME: Final = "name"
 SORT_KEYS: Final[tuple[str, ...]] = (SORT_DATE, SORT_CATEGORY, SORT_NAME)
+
+# --- Home Assistant layer (plain strings, still no HA imports) -------------- #
+STORAGE_VERSION: Final = 1
+SAVE_DELAY_S: Final = 1
+SIGNAL_UPDATED: Final = f"{DOMAIN}_updated"
+CARD_URL: Final = f"/{DOMAIN}/freezer-inventory-card.js"
+DEFAULT_NAME: Final = "Freezer"

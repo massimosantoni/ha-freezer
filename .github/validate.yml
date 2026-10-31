@@ -1,0 +1,39 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 4 * * 1" # weekly: catch breaking changes in new HA releases
+  workflow_dispatch:
+
+jobs:
+  hassfest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: hacs/action@main
+        with:
+          category: integration
+          # not listed in home-assistant/brands (custom integration)
+          ignore: brands
+
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # must match the Python required by the latest Home Assistant release
+          python-version: "3.14"
+          cache: pip
+      - run: pip install -r requirements_test.txt
+      - run: pip list | grep -Ei "^(homeassistant|pytest-homeassistant)"
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: pytest -q -p no:logging

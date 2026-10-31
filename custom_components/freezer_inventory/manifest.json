@@ -1,0 +1,14 @@
+{
+  "domain": "freezer_inventory",
+  "name": "Freezer Inventory",
+  "codeowners": ["@massimosantoni"],
+  "config_flow": true,
+  "dependencies": ["frontend", "http", "websocket_api"],
+  "documentation": "https://github.com/massimosantoni/ha-freezer",
+  "integration_type": "service",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/massimosantoni/ha-freezer/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "0.1.0"
+}

@@ -1,0 +1,20 @@
+{
+  "entity": {
+    "sensor": {
+      "total": { "default": "mdi:fridge-industrial" },
+      "carne": { "default": "mdi:food-steak" },
+      "verdura": { "default": "mdi:carrot" },
+      "frutta": { "default": "mdi:fruit-cherries" },
+      "altro": { "default": "mdi:package-variant" }
+    }
+  },
+  "services": {
+    "add_item": { "service": "mdi:plus-box" },
+    "add_piece": { "service": "mdi:plus" },
+    "take_piece": { "service": "mdi:minus" },
+    "update_item": { "service": "mdi:pencil" },
+    "delete_item": { "service": "mdi:delete" },
+    "undo_last": { "service": "mdi:undo" },
+    "list_items": { "service": "mdi:format-list-bulleted" }
+  }
+}

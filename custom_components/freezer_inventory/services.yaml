@@ -1,0 +1,117 @@
+add_item:
+  fields:
+    name:
+      required: true
+      example: "Bistecche di manzo – macellaio"
+      selector:
+        text:
+    category:
+      required: true
+      default: carne
+      selector:
+        select:
+          translation_key: category
+          options:
+            - carne
+            - verdura
+            - frutta
+            - altro
+    quantity:
+      selector:
+        number:
+          min: 1
+          max: 50
+          mode: box
+    weights:
+      example: "200 300 0,5kg"
+      selector:
+        text:
+    note:
+      selector:
+        text:
+          multiline: true
+
+add_piece:
+  fields:
+    item_id:
+      required: true
+      selector:
+        text:
+    weight_g:
+      selector:
+        number:
+          min: 1
+          max: 50000
+          unit_of_measurement: g
+          mode: box
+
+take_piece:
+  fields:
+    item_id:
+      required: true
+      selector:
+        text:
+    piece_id:
+      selector:
+        text:
+
+update_item:
+  fields:
+    item_id:
+      required: true
+      selector:
+        text:
+    name:
+      selector:
+        text:
+    category:
+      selector:
+        select:
+          translation_key: category
+          options:
+            - carne
+            - verdura
+            - frutta
+            - altro
+    note:
+      selector:
+        text:
+          multiline: true
+    pieces:
+      example: '[{"id": "01J…", "weight_g": 250}, {"weight_g": 300}]'
+      selector:
+        object:
+
+delete_item:
+  fields:
+    item_id:
+      required: true
+      selector:
+        text:
+
+undo_last:
+
+list_items:
+  fields:
+    category:
+      selector:
+        select:
+          translation_key: category
+          options:
+            - carne
+            - verdura
+            - frutta
+            - altro
+    sort:
+      default: date
+      selector:
+        select:
+          translation_key: sort
+          options:
+            - date
+            - category
+            - name
+    descending:
+      default: false
+      selector:
+        boolean:

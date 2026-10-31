@@ -69,6 +69,7 @@ UNSET: Any = _Unset()
 # Validation / parsing helpers
 # --------------------------------------------------------------------------- #
 
+
 def normalize_name(value: Any) -> str:
     if not isinstance(value, str):
         raise InventoryError("invalid_name", "Name must be a string")
@@ -101,9 +102,7 @@ def normalize_note(value: Any) -> str:
         raise InventoryError("invalid_note", "Note must be a string")
     note = value.strip()
     if len(note) > NOTE_MAX_LEN:
-        raise InventoryError(
-            "invalid_note", f"Note exceeds {NOTE_MAX_LEN} characters", max=NOTE_MAX_LEN
-        )
+        raise InventoryError("invalid_note", f"Note exceeds {NOTE_MAX_LEN} characters", max=NOTE_MAX_LEN)
     return note
 
 
@@ -203,6 +202,7 @@ def _parse_dt(value: Any) -> datetime:
 # Model
 # --------------------------------------------------------------------------- #
 
+
 @dataclass
 class Piece:
     id: str
@@ -258,9 +258,7 @@ class Item:
         for piece in self.pieces:
             if piece.id == piece_id:
                 return piece
-        raise InventoryError(
-            "piece_not_found", f"Piece {piece_id} not found in {self.id}", piece_id=piece_id
-        )
+        raise InventoryError("piece_not_found", f"Piece {piece_id} not found in {self.id}", piece_id=piece_id)
 
     # ----- (de)serialisation ---------------------------------------------- #
     def to_dict(self) -> dict[str, Any]:
@@ -356,6 +354,7 @@ class TakeResult:
 # Inventory
 # --------------------------------------------------------------------------- #
 
+
 def _default_now() -> datetime:
     return datetime.now().astimezone()
 
@@ -401,9 +400,7 @@ class Inventory:
         try:
             return self.items[item_id]
         except KeyError:
-            raise InventoryError(
-                "item_not_found", f"Item {item_id} not found", item_id=item_id
-            ) from None
+            raise InventoryError("item_not_found", f"Item {item_id} not found", item_id=item_id) from None
 
     def _record(
         self,
@@ -472,9 +469,7 @@ class Inventory:
                 )
             piece_weights = [None] * qty
         if len(piece_weights) > QUANTITY_MAX:
-            raise InventoryError(
-                "invalid_quantity", f"Quantity must be 1-{QUANTITY_MAX}", max=QUANTITY_MAX
-            )
+            raise InventoryError("invalid_quantity", f"Quantity must be 1-{QUANTITY_MAX}", max=QUANTITY_MAX)
 
         now = self._now_checked()
         item = Item(
@@ -495,9 +490,7 @@ class Inventory:
         item = self.get_item(item_id)
         weight = validate_weight(weight_g)
         if item.quantity >= QUANTITY_MAX:
-            raise InventoryError(
-                "invalid_quantity", f"Quantity must be 1-{QUANTITY_MAX}", max=QUANTITY_MAX
-            )
+            raise InventoryError("invalid_quantity", f"Quantity must be 1-{QUANTITY_MAX}", max=QUANTITY_MAX)
         now = self._now_checked()
         before = self._snapshot(item)
         piece = Piece(id=self._new_id(), added_at=now, weight_g=weight)
@@ -507,9 +500,7 @@ class Inventory:
         self._record("add_piece", item.id, item.name, before, user, now, weight_g=weight)
         return piece
 
-    def take_piece(
-        self, item_id: str, piece_id: str | None = None, *, user: str | None = None
-    ) -> TakeResult:
+    def take_piece(self, item_id: str, piece_id: str | None = None, *, user: str | None = None) -> TakeResult:
         """Remove one piece; the oldest unless ``piece_id`` is given (decision D3)."""
         item = self.get_item(item_id)
         piece = item.get_piece(piece_id) if piece_id else item.pieces[0]
