@@ -1,6 +1,6 @@
 # Inventario freezer in Home Assistant — analisi e piano
 
-_Stato: approvato, Fasi 1–2 completate — 31/10/2026_
+_Stato: Fasi 1–4 completate, release 0.2.0 — 31/10/2026_
 
 ## 1. Requisiti (dalla richiesta)
 
@@ -83,8 +83,11 @@ freezer-inventory/                       # repo GitHub (pubblico: HACS non gesti
 │   ├── const.py             # DOMAIN, CATEGORIES, limiti
 │   ├── inventory.py         # modello + logica pura (add/take/update/undo), senza import HA → testabile
 │   ├── sensor.py            # sensori riepilogo
+│   ├── manager.py           # Store + operazioni condivise da servizi e websocket
+│   ├── schemas.py           # schemi voluptuous comuni
+│   ├── services.py          # azioni HA
 │   ├── websocket.py         # API per la card (subscribe + comandi)
-│   ├── services.yaml
+│   ├── services.yaml, icons.json
 │   ├── translations/it.json, en.json
 │   └── frontend/freezer-inventory-card.js   # Web Component vanilla, installato insieme all'integrazione
 ├── tests/
@@ -162,11 +165,12 @@ freezer-inventory/                       # repo GitHub (pubblico: HACS non gesti
 ```
 
 - **Tap sulla riga** → dialog di modifica (nome, categoria, nota, pezzi con peso e data editabili, elimina voce con conferma).
-- **＋** → aggiunge un pezzo senza peso; toast "Aggiunto · *Aggiungi peso* · Annulla".
+- **＋** → aggiunge un pezzo senza peso; notifica con «Annulla» (il peso si aggiunge dalla modifica voce).
 - **－** → bottom sheet con i pezzi come chip (`200 g · 31/10`, `— · 12/11`), il più vecchio preselezionato, pulsante **Preleva** (D3). Toast **Annulla** 6 s. Ultimo pezzo: "Preleva ed elimina voce".
 - **Aggiungi**: nome con autocompletamento, chip categoria, stepper quantità, campo "Pesi (facoltativo)", nota.
-- **Età colorata** con soglie per categoria nelle opzioni dell'integrazione.
+- **Età colorata** con soglie per categoria (`age_warning_months` nella config della card).
 - Web Component vanilla, `<dialog>` nativo, variabili CSS del tema HA.
+- Notifiche con le `hass-notification` native di HA (azione «Annulla» → `undo_last`); pulsante ↶ in testata finché c'è qualcosa da annullare.
 
 ### 3.7 Accesso rapido in famiglia
 
@@ -179,9 +183,9 @@ freezer-inventory/                       # repo GitHub (pubblico: HACS non gesti
 |---|---|---|
 | 1 | `inventory.py` + test pytest puri | ✅ 55 test |
 | 2 | `__init__`, config flow, servizi, websocket, sensori; test con `pytest-homeassistant-custom-component` | ✅ 21 test (HA 2026.2.3 in locale; CI su ultima HA) — card provvisoria in sola lettura |
-| 3 | Card: lista, sort/filtri, +/-, sheet prelievo, toast undo | |
-| 4 | Dialog aggiungi/modifica, autocompletamento, età colorata, traduzioni | |
-| 5 | Repo GitHub, `hacs.json`, workflow CI (hassfest, HACS validation, pytest), prima release `v0.1.0`; installazione come custom repository HACS; vista dashboard + tag NFC | packaging e CI pronti; release da fare |
+| 3 | Card: lista, sort/filtri, +/-, sheet prelievo, toast undo | ✅ 0.2.0 |
+| 4 | Dialog aggiungi/modifica, autocompletamento, età colorata, traduzioni | ✅ 0.2.0 (soglie età nella config della card; card solo in italiano) |
+| 5 | Repo GitHub, `hacs.json`, workflow CI (hassfest, HACS validation, pytest), prima release; installazione come custom repository HACS; vista dashboard + tag NFC | CI verde, installato via HACS; release `v0.2.0` e tag NFC da fare |
 | 6 (extra) | Intent Assist, export CSV, notifiche età | |
 
 Note di deploy:
@@ -189,3 +193,5 @@ Note di deploy:
 - `version` in `manifest.json` allineata al tag (controllo in CI).
 - Forgejo eventualmente come mirror, non necessario.
 - Backup: coperto dai backup HA (`.storage`).
+- 0.1.1 (31/10): la card si registra solo dopo `customElements.whenDefined("home-assistant")`. Il frontend HA sostituisce `window.customElements` con un polyfill di registro scoped *dopo* l'avvio dei moduli extra; una registrazione immediata finiva sul registro nativo → "Custom element not found". Test di regressione in `tests/frontend/`. Verificato funzionante su HA 2026.10.
+- 0.2.0 (31/10): card completa (aggiunta, +/-, prelievo dal pezzo scelto, modifica pezzi e date, eliminazione, annulla, ordinamenti, filtri, ricerca, età evidenziata). Test end-to-end in browser (`tests/e2e/card_e2e.cjs`) contro HA locale.

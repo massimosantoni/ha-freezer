@@ -15,14 +15,26 @@ Inventario del freezer integrato in Home Assistant: ogni **voce** (es. "Bistecch
 2. Cerca **Freezer Inventory** → Download → riavvia Home Assistant
 3. Impostazioni → Dispositivi e servizi → **Aggiungi integrazione** → Freezer Inventory
 
-La card viene registrata automaticamente: in una dashboard aggiungi
+La card viene registrata automaticamente: in una dashboard aggiungi la card **Freezer Inventory** dal selettore, oppure
 
 ```yaml
 type: custom:freezer-inventory-card
 title: Freezer piano terra
+age_warning_months:   # facoltativo: età oltre la quale la voce è evidenziata
+  carne: 6
+  verdura: 10
+  frutta: 10
+  altro: 3
 ```
 
-> Versione attuale della card: elenco in sola lettura (Fase 2). La card completa con +/-, prelievo, aggiunta e modifica arriva con la Fase 3.
+### Uso della card
+
+- **＋ Aggiungi**: nome (con suggerimenti dai nomi già presenti), categoria, quantità oppure pesi dei singoli pezzi (`200 300 0,5kg`), nota. Crea sempre una voce nuova.
+- **＋ sulla riga**: aggiunge un pezzo con la data di oggi.
+- **－ sulla riga**: apre la scelta del pezzo da prelevare (peso e data di ogni pezzo); il più vecchio è preselezionato. Sull'ultimo pezzo la voce viene eliminata.
+- **Tocco sulla riga**: modifica nome, categoria, nota, peso e data di ogni pezzo; aggiunta/rimozione pezzi; eliminazione voce (doppia conferma).
+- Ogni operazione mostra una notifica con **Annulla**; il pulsante **↶** in alto annulla l'ultima operazione anche più tardi.
+- Ordinamento per **data** (pezzo più vecchio prima), **categoria** o **nome** (ricordato per dispositivo), filtro per categoria, ricerca su nome e nota.
 
 ## Entità
 
@@ -64,6 +76,9 @@ pip install -r requirements_test.txt
 ruff check . && pytest -q -p no:logging
 ```
 
-`tests/test_inventory.py` copre la logica pura (`inventory.py`, nessuna dipendenza da HA); `tests/ha/` testa l'integrazione su un Home Assistant reale.
+- `tests/test_inventory.py`: logica pura (`inventory.py`, nessuna dipendenza da HA)
+- `tests/ha/`: integrazione su un Home Assistant reale
+- `tests/frontend/`: registrazione della card (`node --test tests/frontend/card_registration.test.mjs`)
+- `tests/e2e/card_e2e.cjs`: prova completa della card in un browser contro un HA avviato (manuale, istruzioni nel file)
 
 Release: aggiorna `version` in `manifest.json`, crea il tag `vX.Y.Z` e una GitHub Release; HACS proporrà l'aggiornamento.
