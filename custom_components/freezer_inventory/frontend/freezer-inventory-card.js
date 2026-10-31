@@ -9,6 +9,10 @@
 const CATEGORY_ICON = { carne: "🥩", verdura: "🥦", frutta: "🍓", altro: "📦" };
 
 class FreezerInventoryCard extends HTMLElement {
+  static getStubConfig() {
+    return { title: "Freezer" };
+  }
+
   setConfig(config) {
     this._config = config || {};
     this._render();
@@ -93,12 +97,26 @@ function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 }
 
-if (!customElements.get("freezer-inventory-card")) {
-  customElements.define("freezer-inventory-card", FreezerInventoryCard);
+/*
+ * Registration must wait for the HA frontend. The frontend replaces
+ * window.customElements with a scoped-registry polyfill *after* extra modules
+ * start loading; an element defined on the native registry before the swap is
+ * invisible to Lovelace ("Custom element not found"). The polyfill defines
+ * <home-assistant> through the native registry, so its whenDefined() resolves
+ * only once the final registry is in place. A timeout covers pages without it.
+ */
+const TAG = "freezer-inventory-card";
+
+function register() {
+  if (customElements.get(TAG)) return; // `customElements` is read now, not at module load
+  customElements.define(TAG, FreezerInventoryCard);
   window.customCards = window.customCards || [];
-  window.customCards.push({
-    type: "freezer-inventory-card",
-    name: "Freezer Inventory",
-    description: "Contenuto del freezer",
-  });
+  if (!window.customCards.some((c) => c.type === TAG)) {
+    window.customCards.push({ type: TAG, name: "Freezer Inventory", description: "Contenuto del freezer" });
+  }
 }
+
+Promise.race([
+  customElements.whenDefined("home-assistant"),
+  new Promise((resolve) => setTimeout(resolve, 10000)),
+]).then(register);

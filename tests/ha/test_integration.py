@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from datetime import timedelta
 
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 
+from custom_components.freezer_inventory import CARD_FILE
 from custom_components.freezer_inventory.const import CARD_URL, DOMAIN
 from homeassistant import config_entries
 from homeassistant.components.frontend import DATA_EXTRA_MODULE_URL
@@ -69,7 +71,8 @@ async def test_setup_creates_sensors_and_card(hass: HomeAssistant, loaded_entry,
     for cat in ("carne", "verdura", "frutta", "altro"):
         assert category_sensor(hass, loaded_entry, cat).state == "0"
 
-    assert f"{CARD_URL}?v=0.1.0" in hass.data[DATA_EXTRA_MODULE_URL].urls
+    version = json.loads((CARD_FILE.parents[1] / "manifest.json").read_text())["version"]
+    assert f"{CARD_URL}?v={version}" in hass.data[DATA_EXTRA_MODULE_URL].urls
     client = await hass_client()
     resp = await client.get(CARD_URL)
     assert resp.status == 200
