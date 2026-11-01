@@ -3,7 +3,7 @@
 Inventario del freezer integrato in Home Assistant: ogni **voce** (es. "Bistecche di manzo") contiene dei **pezzi**, ciascuno con la propria data di inserimento e un peso facoltativo. Pensato per essere usato da tutta la famiglia dall'app companion.
 
 - Categorie: carne, verdura, frutta, altro
-- Quantità = numero di pezzi; pesi per singolo pezzo facoltativi (`200 300 0,5kg`)
+- Quantità = numero di pezzi; per ogni pezzo, facoltativo, un peso **oppure** un numero di porzioni (`300 0,5kg 4`)
 - Prelievo del pezzo scelto (o del più vecchio), annullabile
 - Nota libera, modifica di ogni campo, storico delle ultime 300 operazioni
 - Card Lovelace inclusa, aggiornamento live su tutti i dispositivi
@@ -29,10 +29,22 @@ age_warning_months:   # facoltativo: età oltre la quale la voce è evidenziata
 
 ### Uso della card
 
-- **＋ Aggiungi**: nome (con suggerimenti dai nomi già presenti), categoria, quantità oppure pesi dei singoli pezzi (`200 300 0,5kg`), nota. Crea sempre una voce nuova.
+**Peso o porzioni** — un solo campo per pezzo, l'unità si deduce dal numero:
+
+| Scrivi | Diventa |
+|---|---|
+| `300`, `1200` (da 10 in su) | grammi |
+| `0,5kg`, `1.2 kg`, `3hg`, `5g` | grammi (unità esplicita) |
+| `4` (intero sotto 10) | 4 porzioni |
+| `12 por`, `12 porzioni` | porzioni oltre 9 |
+| `0,5` | errore: scrivi `0,5kg` |
+
+In aggiunta multipla i valori si separano con spazi: `300 0,5kg 4` = tre pezzi. I totali mostrano grammi e porzioni separati (es. `1,2 kg · 9 por.`); un `+` finale indica che alcuni pezzi non hanno né peso né porzioni.
+
+- **＋ Aggiungi**: nome (con suggerimenti dai nomi già presenti), categoria, quantità oppure peso/porzioni dei singoli pezzi, nota. Crea sempre una voce nuova.
 - **＋ sulla riga**: aggiunge un pezzo con la data di oggi.
-- **－ sulla riga**: apre la scelta del pezzo da prelevare (peso e data di ogni pezzo); il più vecchio è preselezionato. Sull'ultimo pezzo la voce viene eliminata.
-- **Tocco sulla riga**: modifica nome, categoria, nota, peso e data di ogni pezzo; aggiunta/rimozione pezzi; eliminazione voce (doppia conferma).
+- **－ sulla riga**: apre la scelta del pezzo da prelevare (peso o porzioni e data di ogni pezzo); il più vecchio è preselezionato. Sull'ultimo pezzo la voce viene eliminata.
+- **Tocco sulla riga**: modifica nome, categoria, nota, peso/porzioni e data di ogni pezzo; aggiunta/rimozione pezzi; eliminazione voce (doppia conferma).
 - Ogni operazione mostra una notifica con **Annulla**; il pulsante **↶** in alto annulla l'ultima operazione anche più tardi.
 - Ordinamento per **data** (pezzo più vecchio prima), **categoria** o **nome** (ricordato per dispositivo), filtro per categoria, ricerca su nome e nota.
 
@@ -40,15 +52,15 @@ age_warning_months:   # facoltativo: età oltre la quale la voce è evidenziata
 
 | Entità | Stato | Attributi |
 |---|---|---|
-| `sensor.<freezer>_pezzi_totali` | pezzi totali | voci, peso totale noto (g), pezzo più vecchio |
+| `sensor.<freezer>_pezzi_totali` | pezzi totali | voci, peso totale noto (g), porzioni totali, pezzo più vecchio |
 | `sensor.<freezer>_carne` … `_altro` | pezzi per categoria | voci |
 
 ## Azioni (servizi)
 
 | Azione | Parametri | Risposta |
 |---|---|---|
-| `freezer_inventory.add_item` | `name`, `category`, `quantity`?, `weights`?, `note`? | `item` |
-| `freezer_inventory.add_piece` | `item_id`, `weight_g`? | `item`, `piece` |
+| `freezer_inventory.add_item` | `name`, `category`, `quantity`?, `weights`? (pesi o porzioni, es. `300 0,5kg 4`), `note`? | `item` |
+| `freezer_inventory.add_piece` | `item_id`, `weight_g`? \| `portions`? \| `amount`? (testo, es. `4`) | `item`, `piece` |
 | `freezer_inventory.take_piece` | `item_id`, `piece_id`? (default: il più vecchio) | `piece`, `item`, `item_deleted` |
 | `freezer_inventory.update_item` | `item_id`, `name`?, `category`?, `note`?, `pieces`? | `item` |
 | `freezer_inventory.delete_item` | `item_id` | `item` |
@@ -64,7 +76,7 @@ action: freezer_inventory.add_item
 data:
   name: Bistecche di manzo – macellaio
   category: carne
-  weights: "200 300 0,5kg"
+  weights: "300 0,5kg 4"   # 300 g, 500 g, 4 porzioni
   note: sottovuoto
 response_variable: result
 ```

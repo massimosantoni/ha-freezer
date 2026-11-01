@@ -29,13 +29,15 @@ const ERRORS = {
   invalid_name: "Il nome deve avere tra 2 e 80 caratteri.",
   invalid_category: "Scegli una categoria.",
   invalid_note: "La nota non può superare i 500 caratteri.",
-  invalid_weight: "Peso non valido: usa grammi o kg tra 1 g e 50 kg (es. «200 300 0,5kg»).",
+  invalid_amount: "Valore non valido: grammi (es. 250, 0,5kg) oppure porzioni (intero sotto 10, es. 4; oltre scrivi «12 por»).",
+  invalid_weight: "Peso non valido: deve essere tra 1 g e 50 kg.",
+  invalid_portions: "Le porzioni devono essere tra 1 e 50.",
   invalid_quantity: "La quantità deve essere tra 1 e 50.",
-  quantity_weights_mismatch: "La quantità non corrisponde al numero di pesi.",
+  quantity_weights_mismatch: "La quantità non corrisponde al numero di valori indicati.",
   item_not_found: "Voce non trovata: forse è già stata prelevata o eliminata.",
   piece_not_found: "Pezzo non trovato: forse è già stato prelevato.",
   empty_pieces: "Serve almeno un pezzo: per togliere la voce usa «Elimina voce».",
-  invalid_piece: "Elenco pezzi non valido.",
+  invalid_piece: "Pezzo non valido: indica un peso oppure delle porzioni.",
   invalid_date: "Data non valida.",
   nothing_to_undo: "Non c'è nulla da annullare.",
   not_loaded: "L'integrazione Freezer Inventory non è attiva.",
@@ -54,6 +56,23 @@ const esc = (s) =>
 
 const formatWeight = (g) =>
   g >= 1000 ? `${(g / 1000).toLocaleString("it-IT", { maximumFractionDigits: 2 })} kg` : `${g} g`;
+
+const formatPortions = (n) => `${n} por.`;
+
+// what a piece holds, for chips: "300 g", "4 por.", "—"
+function formatAmount(p) {
+  if (p.weight_g != null) return formatWeight(p.weight_g);
+  if (p.portions != null) return formatPortions(p.portions);
+  return "—";
+}
+
+// value for the single "g / por." input; round-trips through the server parser:
+// bare numbers below 10 are portions, so small weights / big portion counts get a unit
+function amountInput(p) {
+  if (p?.weight_g != null) return p.weight_g >= 10 ? `${p.weight_g}` : `${p.weight_g}g`;
+  if (p?.portions != null) return p.portions < 10 ? `${p.portions}` : `${p.portions} por`;
+  return "";
+}
 
 function formatDate(iso) {
   const d = new Date(iso);
@@ -326,10 +345,14 @@ class FreezerInventoryCard extends HTMLElement {
 
   _rowHtml(item) {
     const meta = [`${item.quantity} pz`];
-    if (item.weighed_pieces) {
-      const partial = item.weighed_pieces < item.quantity ? "+" : "";
-      meta.push(`${formatWeight(item.total_weight_g)}${partial}`);
+    const measures = [];
+    if (item.weighed_pieces) measures.push(formatWeight(item.total_weight_g));
+    if (item.portioned_pieces) measures.push(formatPortions(item.total_portions));
+    // "+" = some pieces have no weight/portions, so the total is a lower bound
+    if (measures.length && item.weighed_pieces + item.portioned_pieces < item.quantity) {
+      measures[measures.length - 1] += "+";
     }
+    meta.push(...measures);
     const months = ageDays(item.oldest_added_at) / 30.44;
     const old = months >= (this._ageWarning[item.category] ?? Infinity);
     meta.push(`<span class="age ${old ? "old" : ""}">da ${formatAge(item.oldest_added_at)}</span>`);
@@ -353,7 +376,7 @@ class FreezerInventoryCard extends HTMLElement {
     const chips = item.pieces
       .map(
         (p) => `<button class="chip piece" data-piece="${esc(p.id)}">
-          <b>${p.weight_g ? formatWeight(p.weight_g) : "—"}</b><small>${formatDate(p.added_at)}</small></button>`,
+          <b>${formatAmount(p)}</b><small>${formatDate(p.added_at)}</small></button>`,
       )
       .join("");
     const last = item.quantity === 1;
@@ -383,8 +406,8 @@ class FreezerInventoryCard extends HTMLElement {
       try {
         const res = await this._call("take_piece", { item_id: item.id, piece_id: selected });
         dlg.close();
-        const w = res.piece.weight_g ? `${formatWeight(res.piece.weight_g)} ` : "";
-        this._toast(`Prelevato ${w}da «${item.name}»`, true);
+        const what = formatAmount(res.piece);
+        this._toast(`Prelevato ${what === "—" ? "" : `${what} `}da «${item.name}»`, true);
       } catch (err) {
         const p = dlg.querySelector(".err");
         p.textContent = errorText(err);
@@ -520,8 +543,9 @@ class FreezerInventoryCard extends HTMLElement {
           <button type="button" class="round" data-step="1" aria-label="Più">＋</button>
         </div>
       </div>
-      <label>Pesi dei pezzi <span class="opt">(facoltativo, uno per pezzo)</span>
-        <input name="weights" placeholder="es. 200 300 0,5kg" autocomplete="off" inputmode="decimal">
+      <label>Peso o porzioni dei pezzi <span class="opt">(facoltativo, uno per pezzo)</span>
+        <input name="weights" placeholder="es. 300 0,5kg 4" autocomplete="off">
+        <span class="opt">da 10 in su = grammi, sotto 10 = porzioni</span>
       </label>`;
   }
 
@@ -532,7 +556,7 @@ class FreezerInventoryCard extends HTMLElement {
 
   _piecesEditorHtml(item) {
     return `
-      <div class="field">Pezzi
+      <div class="field">Pezzi <span class="opt">(peso in g, oppure porzioni se sotto 10)</span>
         <div class="pieces-editor">${item.pieces.map((p) => this._pieceRowHtml(p)).join("")}</div>
         <button type="button" data-action="add-piece">＋ Aggiungi pezzo</button>
       </div>`;
@@ -541,8 +565,8 @@ class FreezerInventoryCard extends HTMLElement {
   _pieceRowHtml(p) {
     return `
       <div class="piece-row" data-piece="${esc(p?.id || "")}" data-day="${p ? isoDay(p.added_at) : ""}">
-        <input class="w" type="number" min="1" max="50000" step="1" placeholder="peso" inputmode="numeric"
-          value="${p?.weight_g ?? ""}" aria-label="Peso in grammi"><span class="unit">g</span>
+        <input class="w" placeholder="g / por." autocomplete="off"
+          value="${esc(amountInput(p))}" aria-label="Peso in grammi o porzioni">
         <input class="d" type="date" value="${isoDay(p?.added_at)}" max="${isoDay()}" aria-label="Data di inserimento">
         <button type="button" class="round" data-action="remove-piece" aria-label="Rimuovi pezzo">×</button>
       </div>`;
@@ -556,9 +580,9 @@ class FreezerInventoryCard extends HTMLElement {
     // existing piece: send added_at only if the day changed (keeps the exact time otherwise);
     // new piece: send the day only if it is not today (server uses "now")
     return [...form.querySelectorAll(".piece-row")].map((row) => {
-      const weight = row.querySelector(".w").value;
       const day = row.querySelector(".d").value;
-      const piece = { weight_g: weight === "" ? null : Number(weight) };
+      // parsed by the server with the same rule as the add form ("" = unknown)
+      const piece = { amount: row.querySelector(".w").value.trim() };
       if (row.dataset.piece) {
         piece.id = row.dataset.piece;
         if (day && day !== row.dataset.day) piece.added_at = day;
@@ -616,8 +640,7 @@ const STYLE = `
   .stepper input { width: 80px; text-align: center; font-size: 1.1em; }
   .pieces-editor { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
   .piece-row { display: flex; align-items: center; gap: 6px; }
-  .piece-row .w { width: 90px; flex: none; }
-  .piece-row .unit { margin-left: -2px; }
+  .piece-row .w { width: 100px; flex: none; }
   .piece-row .d { flex: 1; min-width: 0; }
   .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
   .actions .spacer { flex: 1; }

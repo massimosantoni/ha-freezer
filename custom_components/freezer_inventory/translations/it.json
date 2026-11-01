@@ -26,6 +26,9 @@
           },
           "oldest_added_at": {
             "name": "Pezzo più vecchio"
+          },
+          "total_portions": {
+            "name": "Porzioni totali"
           }
         }
       },
@@ -74,13 +77,13 @@
       "message": "La nota non può superare i 500 caratteri."
     },
     "invalid_weight": {
-      "message": "Peso non valido: usa grammi o kg tra 1 g e 50 kg (es. «200 300 0,5kg»)."
+      "message": "Peso non valido: deve essere tra 1 g e 50 kg."
     },
     "invalid_quantity": {
       "message": "La quantità deve essere tra 1 e 50."
     },
     "quantity_weights_mismatch": {
-      "message": "Quantità {quantity} diversa dal numero di pesi indicati ({weights})."
+      "message": "Quantità {quantity} diversa dal numero di valori indicati ({weights})."
     },
     "item_not_found": {
       "message": "Voce non trovata (forse già prelevata o eliminata)."
@@ -92,7 +95,7 @@
       "message": "Una voce deve avere almeno un pezzo: per toglierla usa «Elimina voce»."
     },
     "invalid_piece": {
-      "message": "Elenco pezzi non valido."
+      "message": "Pezzo non valido: indica un peso oppure delle porzioni, non entrambi."
     },
     "invalid_date": {
       "message": "Data non valida."
@@ -105,6 +108,12 @@
     },
     "not_loaded": {
       "message": "Freezer Inventory non è attivo."
+    },
+    "invalid_amount": {
+      "message": "Valore non valido: grammi (es. 250, 0,5kg) oppure porzioni (numero intero sotto 10, es. 4; oltre scrivi «12 por»)."
+    },
+    "invalid_portions": {
+      "message": "Le porzioni devono essere tra 1 e 50."
     }
   },
   "selector": {
@@ -142,8 +151,8 @@
           "description": "Numero di pezzi senza peso (ignorato se indichi i pesi)."
         },
         "weights": {
-          "name": "Pesi",
-          "description": "Facoltativo: un peso per pezzo, es. «200 300 0,5kg»."
+          "name": "Pesi o porzioni",
+          "description": "Facoltativo: un valore per pezzo. Numeri da 10 in su = grammi (anche 0,5kg), sotto 10 = porzioni; es. «300 0,5kg 4»."
         },
         "note": {
           "name": "Nota",
@@ -161,7 +170,15 @@
         },
         "weight_g": {
           "name": "Peso",
-          "description": "Peso facoltativo in grammi."
+          "description": "Facoltativo: peso in grammi."
+        },
+        "portions": {
+          "name": "Porzioni",
+          "description": "Facoltativo: numero di porzioni del pezzo."
+        },
+        "amount": {
+          "name": "Peso o porzioni (testo)",
+          "description": "Facoltativo, alternativa ai due campi: «250», «0,5kg», «4» (porzioni), «12 por»."
         }
       }
     },
@@ -201,7 +218,7 @@
         },
         "pieces": {
           "name": "Pezzi",
-          "description": "Sostituisce l'elenco: pezzi con «id» vengono aggiornati, senza «id» vengono creati, quelli non elencati rimossi."
+          "description": "Sostituisce l'elenco: pezzi con «id» vengono aggiornati, senza «id» creati, quelli non elencati rimossi. Per ogni pezzo «amount» (testo, es. «4» o «250») oppure «weight_g»/«portions», e «added_at» facoltativo."
         }
       }
     },

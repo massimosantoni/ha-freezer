@@ -23,7 +23,7 @@ add_item:
           max: 50
           mode: box
     weights:
-      example: "200 300 0,5kg"
+      example: "300 0,5kg 4"
       selector:
         text:
     note:
@@ -44,6 +44,16 @@ add_piece:
           max: 50000
           unit_of_measurement: g
           mode: box
+    portions:
+      selector:
+        number:
+          min: 1
+          max: 50
+          mode: box
+    amount:
+      example: "4"
+      selector:
+        text:
 
 take_piece:
   fields:
@@ -78,7 +88,7 @@ update_item:
         text:
           multiline: true
     pieces:
-      example: '[{"id": "01J…", "weight_g": 250}, {"weight_g": 300}]'
+      example: '[{"id": "01J…", "amount": "250"}, {"amount": "4"}]'
       selector:
         object:
 

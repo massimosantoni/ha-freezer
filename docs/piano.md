@@ -1,6 +1,6 @@
 # Inventario freezer in Home Assistant — analisi e piano
 
-_Stato: Fasi 1–4 completate, release 0.2.0 — 31/10/2026_
+_Stato: Fasi 1–4 completate, versione 0.3.0 (porzioni) — 01/11/2026_
 
 ## 1. Requisiti (dalla richiesta)
 
@@ -69,6 +69,7 @@ Integrazione custom `freezer_inventory`.
 | D3 | **Prelievo**: nella card si sceglie il pezzo dal chip (ognuno ha data e peso propri); il più vecchio è solo preselezionato. Il servizio `take_piece` senza `piece_id` preleva il più vecchio (utile per automazioni/Assist). |
 | D4 | **Un solo freezer**: `single_config_entry: true` nel manifest. Il modello resta per-entry, quindi aprire a più freezer in futuro non richiede migrazioni. |
 | D5 | **Deploy via GitHub + HACS** (custom repository), release taggate. |
+| D6 | **Porzioni** (01/11): un solo campo «g / por.» per pezzo, unità dedotta dal valore (sotto 10 = porzioni). Nessun selettore di unità esplicito nell'interfaccia. |
 
 ### 3.2 Struttura del repository
 
@@ -117,8 +118,9 @@ freezer-inventory/                       # repo GitHub (pubblico: HACS non gesti
       "updated_at": "…",
       "created_by": "Max",
       "pieces": [
-        { "id": "…", "weight_g": 200,  "added_at": "2026-10-31T18:02:11+01:00" },
-        { "id": "…", "weight_g": null, "added_at": "2026-11-12T10:15:00+01:00" }
+        { "id": "…", "weight_g": 200,  "portions": null, "added_at": "2026-10-31T18:02:11+01:00" },
+        { "id": "…", "weight_g": null, "portions": 4,    "added_at": "2026-11-01T10:15:00+01:00" },
+        { "id": "…", "weight_g": null, "portions": null, "added_at": "2026-11-12T10:15:00+01:00" }
       ]
     }
   },
@@ -126,11 +128,11 @@ freezer-inventory/                       # repo GitHub (pubblico: HACS non gesti
 }
 ```
 
-- **quantità = `len(pieces)`**; peso sempre opzionale.
+- **quantità = `len(pieces)`**; per pezzo, facoltativo, un peso **oppure** un numero di porzioni (mai entrambi). Salvati in campi separati così i totali in g e in porzioni restano corretti.
 - **`added_at` per pezzo**; l'ordinamento per data usa il pezzo più vecchio (FIFO).
 - **Voce a 0 pezzi → eliminata**; lo snapshot `before` nel log permette l'undo.
 - Log a ring buffer (300 voci); `undo_last` ripristina lo snapshot dell'ultima operazione non annullata.
-- Pesi in grammi interi. Parsing input: `200 300 0,5kg 1.2 kg 3hg` → `[200, 300, 500, 1200, 300]`; numero senza unità < 10 = kg, altrimenti g.
+- Parsing input (dalla 0.3.0, decisione D6): numero senza unità **< 10 = porzioni** (intero), ≥ 10 = grammi; unità esplicite `g/gr/hg/kg` e `por/porz/porzioni` hanno la precedenza. `300 0,5kg 4 12por` → 300 g, 500 g, 4 por, 12 por. `0,5` senza unità è un errore (prima valeva 500 g).
 
 ### 3.4 Servizi
 
@@ -195,3 +197,4 @@ Note di deploy:
 - Backup: coperto dai backup HA (`.storage`).
 - 0.1.1 (31/10): la card si registra solo dopo `customElements.whenDefined("home-assistant")`. Il frontend HA sostituisce `window.customElements` con un polyfill di registro scoped *dopo* l'avvio dei moduli extra; una registrazione immediata finiva sul registro nativo → "Custom element not found". Test di regressione in `tests/frontend/`. Verificato funzionante su HA 2026.10.
 - 0.2.0 (31/10): card completa (aggiunta, +/-, prelievo dal pezzo scelto, modifica pezzi e date, eliminazione, annulla, ordinamenti, filtri, ricerca, età evidenziata). Test end-to-end in browser (`tests/e2e/card_e2e.cjs`) contro HA locale.
+- 0.3.0 (01/11): porzioni per pezzo (campo `portions`, totale `total_portions` nelle voci, nel riepilogo e nel sensore). Input unico «g / por.»: sotto 10 = porzioni. Dati 0.1.x/0.2.x caricati senza migrazione (campo assente = nessuna porzione).

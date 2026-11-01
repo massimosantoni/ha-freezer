@@ -163,7 +163,9 @@ async def test_update_item_localizes_dates(hass: HomeAssistant, loaded_entry) ->
 @pytest.mark.parametrize(
     ("service", "data", "key"),
     [
-        ("add_item", {"name": "Bistecche", "category": "carne", "weights": "due etti"}, "invalid_weight"),
+        ("add_item", {"name": "Bistecche", "category": "carne", "weights": "due etti"}, "invalid_amount"),
+        ("add_item", {"name": "Bistecche", "category": "carne", "weights": "60kg"}, "invalid_weight"),
+        ("add_item", {"name": "Spiedo", "category": "carne", "weights": "60 por"}, "invalid_portions"),
         ("add_item", {"name": "x", "category": "carne"}, "invalid_name"),
         ("add_item", {"name": "Spada", "category": "pesce"}, "invalid_category"),
         (
@@ -304,4 +306,43 @@ async def test_service_descriptions_load(hass: HomeAssistant, loaded_entry) -> N
         "undo_last",
         "list_items",
     }
-    assert descriptions["add_item"]["fields"]["weights"]["example"] == "200 300 0,5kg"
+    assert descriptions["add_item"]["fields"]["weights"]["example"] == "300 0,5kg 4"
+
+
+async def test_portions_via_services_and_sensor(hass: HomeAssistant, loaded_entry) -> None:
+    item = (await call(hass, "add_item", name="Carne da spiedo", category="carne", weights="4 5"))["item"]
+    assert [(p["weight_g"], p["portions"]) for p in item["pieces"]] == [(None, 4), (None, 5)]
+    assert (item["total_portions"], item["portioned_pieces"], item["total_weight_g"]) == (9, 2, 0)
+
+    res = await call(hass, "add_piece", item_id=item["id"], amount="3")
+    assert res["piece"]["portions"] == 3
+    res = await call(hass, "add_piece", item_id=item["id"], portions=2)
+    assert res["piece"]["portions"] == 2
+    res = await call(hass, "add_item", name="Misto", category="altro", weights=[300, 4, "0,5kg"])
+    assert res["item"]["total_weight_g"] == 800 and res["item"]["total_portions"] == 4
+    await hass.async_block_till_done()
+    attrs = total_sensor(hass, loaded_entry).attributes
+    assert (attrs["total_portions"], attrs["total_weight_g"]) == (18, 800)
+
+    pid = item["pieces"][0]["id"]
+    res = await call(hass, "update_item", item_id=item["id"], pieces=[{"id": pid, "amount": "250"}])
+    assert (res["item"]["pieces"][0]["weight_g"], res["item"]["pieces"][0]["portions"]) == (250, None)
+
+
+async def test_websocket_amount_text(hass: HomeAssistant, loaded_entry, hass_ws_client) -> None:
+    ws = await hass_ws_client(hass)
+    await ws.send_json(
+        {"id": 1, "type": f"{DOMAIN}/add_item", "name": "Spiedo", "category": "carne", "weights": "4 5"}
+    )
+    m = await ws.receive_json()
+    item = m["result"]["item"]
+    await ws.send_json(
+        {
+            "id": 2,
+            "type": f"{DOMAIN}/update_item",
+            "item_id": item["id"],
+            "pieces": [{"id": item["pieces"][0]["id"], "amount": "6"}, {"amount": "0,5"}],
+        }
+    )
+    m = await ws.receive_json()
+    assert m["error"]["code"] == "invalid_amount"

@@ -141,7 +141,42 @@ async function shot(page, name) {
   await form.locator('[data-action="delete"]').click();
   await row("Piselli").waitFor({ state: "detached" });
 
-  // 11. sort preference survives a reload
+  // 11. portions: bare numbers below 10 (0.3.0)
+  await card.locator('button[data-action="add"]').click();
+  await form.locator('input[name="name"]').fill("Carne da spiedo");
+  await form.locator('input[name="weights"]').fill("4 5");
+  assert.equal(await form.locator('input[name="quantity"]').inputValue(), "2");
+  await form.locator('button[type="submit"]').click();
+  await row("spiedo").waitFor();
+  assert.match(await meta("spiedo"), /^2 pz · 9 por\. · da oggi$/);
+  await row("spiedo").locator('[data-action="take"]').click();
+  assert.deepEqual(
+    (await take.locator(".chip.piece b").allInnerTexts()).map((t) => t.trim()),
+    ["4 por.", "5 por."],
+  );
+  await shot(page, "take-portions");
+  await take.locator('[data-action="cancel"]').click();
+  await row("spiedo").locator(".name").click();
+  assert.equal(await form.locator(".piece-row .w").first().inputValue(), "4");
+  await form.locator(".piece-row .w").first().fill("6");
+  await shot(page, "edit-portions");
+  await form.locator('button[type="submit"]').click();
+  await card.locator(".row", { hasText: "spiedo" }).locator(".meta", { hasText: "2 pz · 11 por." }).waitFor();
+  // a piece without amount makes the total a lower bound
+  await row("spiedo").locator('[data-action="plus"]').click();
+  await card.locator(".row", { hasText: "spiedo" }).locator(".meta", { hasText: "3 pz · 11 por.+" }).waitFor();
+  // weights keep round-tripping through the same field
+  await row("Bistecche").locator(".name").click();
+  assert.equal(await form.locator(".piece-row .w").nth(1).inputValue(), "250");
+  await form.locator('[data-action="cancel"]').click();
+  // invalid value is reported in the dialog
+  await row("spiedo").locator(".name").click();
+  await form.locator(".piece-row .w").first().fill("0,5");
+  await form.locator('button[type="submit"]').click();
+  await form.locator(".err").filter({ hasText: "porzioni" }).waitFor();
+  await form.locator('[data-action="cancel"]').click();
+
+  // 12. sort preference survives a reload
   await card.locator('[data-sort="name"]').click();
   await page.reload({ waitUntil: "networkidle" });
   await card.locator(".row").first().waitFor();

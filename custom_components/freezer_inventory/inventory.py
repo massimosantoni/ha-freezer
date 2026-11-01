@@ -30,6 +30,7 @@ from .const import (
     NAME_MAX_LEN,
     NAME_MIN_LEN,
     NOTE_MAX_LEN,
+    PORTIONS_MAX,
     QUANTITY_MAX,
     SORT_CATEGORY,
     SORT_DATE,
@@ -106,21 +107,30 @@ def normalize_note(value: Any) -> str:
     return note
 
 
-def validate_weight(value: Any) -> int | None:
-    """Return a weight in whole grams, or None for "unknown"."""
-    if value is None or value == "":
-        return None
+def _check_int(value: Any, code: str, what: str) -> int:
     if isinstance(value, bool):  # bool is an int subclass; reject explicitly
-        raise InventoryError("invalid_weight", "Weight must be a number of grams")
-    if isinstance(value, str):
-        parsed = parse_weights(value)
-        if len(parsed) != 1:
-            raise InventoryError("invalid_weight", f"Cannot parse weight {value!r}")
-        return parsed[0]
+        raise InventoryError(code, f"{what} must be a number")
     if isinstance(value, float):
         value = round(value)
     if not isinstance(value, int):
-        raise InventoryError("invalid_weight", "Weight must be a number of grams")
+        raise InventoryError(code, f"{what} must be a number")
+    return value
+
+
+def validate_weight(value: Any) -> int | None:
+    """Return a weight in whole grams, or None for "unknown".
+
+    Numbers are grams as given (no portion rule: this is the explicit field).
+    Text goes through the amount parser and must describe a weight.
+    """
+    if value is None or value == "":
+        return None
+    if isinstance(value, str):
+        amount = parse_amount(value)
+        if amount.weight_g is None:
+            raise InventoryError("invalid_weight", f"{value!r} is not a weight")
+        return amount.weight_g
+    value = _check_int(value, "invalid_weight", "Weight")
     if not WEIGHT_MIN_G <= value <= WEIGHT_MAX_G:
         raise InventoryError(
             "invalid_weight",
@@ -131,56 +141,124 @@ def validate_weight(value: Any) -> int | None:
     return value
 
 
-# number, optional decimal part with "," or ".", optional unit
-_WEIGHT_RE = re.compile(r"(\d+(?:[.,]\d+)?)\s*(kg|hg|gr|g)?(?![a-z])")
+def validate_portions(value: Any) -> int | None:
+    """Return a number of portions, or None."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, str):
+        amount = parse_amount(value)
+        if amount.portions is None:
+            raise InventoryError("invalid_portions", f"{value!r} is not a number of portions")
+        return amount.portions
+    value = _check_int(value, "invalid_portions", "Portions")
+    if not 1 <= value <= PORTIONS_MAX:
+        raise InventoryError("invalid_portions", f"Portions must be 1-{PORTIONS_MAX}", max=PORTIONS_MAX)
+    return value
+
+
+@dataclass(frozen=True)
+class Amount:
+    """How much a piece holds: a weight, a number of portions, or unknown."""
+
+    weight_g: int | None = None
+    portions: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.weight_g is not None and self.portions is not None:
+            raise InventoryError("invalid_piece", "A piece has either a weight or portions, not both")
+
+
+UNKNOWN = Amount()
+
+# number, optional decimal part with "," or ".", optional unit (longest alternatives first)
+_AMOUNT_RE = re.compile(r"(\d+(?:[.,]\d+)?)\s*(porzioni|porzione|porz|por|kg|hg|gr|g)?\.?(?![a-z])")
 _UNIT_FACTOR = {"kg": 1000, "hg": 100, "gr": 1, "g": 1}
+_PORTION_UNITS = {"porzioni", "porzione", "porz", "por"}
+
+
+def parse_amounts(text: str) -> list[Amount]:
+    """Parse free text such as ``"300 0,5kg 4 5por"`` into one Amount per token.
+
+    Rules:
+    * tokens are separated by spaces, ``;``, ``/``, ``+`` or ``", "`` (comma + space);
+    * ``,`` or ``.`` directly between digits is a decimal separator;
+    * explicit units: ``g``/``gr``/``hg``/``kg`` → weight, ``por``/``porz``/``porzioni`` → portions;
+    * a bare number **below 10** is a number of portions (must be whole), otherwise grams.
+      So ``4`` = 4 portions, ``300`` = 300 g, ``0,5`` is rejected (write ``0,5kg``).
+
+    Raises InventoryError("invalid_amount") if anything cannot be read.
+    """
+    if not isinstance(text, str):
+        raise InventoryError("invalid_amount", "Amounts must be text")
+    lowered = text.casefold()
+    amounts: list[Amount] = []
+    pos = 0
+    for match in _AMOUNT_RE.finditer(lowered):
+        if lowered[pos : match.start()].strip(" \t;/+,") != "":
+            raise InventoryError("invalid_amount", f"Cannot read {text!r}")
+        raw, unit = match.group(1), match.group(2)
+        number = float(raw.replace(",", "."))
+        if unit is None:
+            unit = "por" if number < 10 else "g"
+        if unit in _PORTION_UNITS:
+            if not number.is_integer():
+                raise InventoryError("invalid_amount", f"Portions must be whole numbers: {raw!r}")
+            amounts.append(Amount(portions=validate_portions(int(number))))
+        else:
+            amounts.append(Amount(weight_g=validate_weight(round(number * _UNIT_FACTOR[unit]))))
+        pos = match.end()
+    if lowered[pos:].strip(" \t;/+,") != "":
+        raise InventoryError("invalid_amount", f"Cannot read {text!r}")
+    return amounts
+
+
+def parse_amount(text: str) -> Amount:
+    """Exactly one amount; empty text means unknown."""
+    if isinstance(text, str) and not text.strip():
+        return UNKNOWN
+    amounts = parse_amounts(text)
+    if len(amounts) != 1:
+        raise InventoryError("invalid_amount", f"Expected one value, got {text!r}")
+    return amounts[0]
 
 
 def parse_weights(text: str) -> list[int]:
-    """Parse free text such as ``"200 300 0,5kg 1.2 kg 3hg"`` into grams.
+    """Backward-compatible helper: only weights allowed."""
+    result = []
+    for amount in parse_amounts(text):
+        if amount.weight_g is None:
+            raise InventoryError("invalid_weight", f"{text!r} contains portions, not weights")
+        result.append(amount.weight_g)
+    return result
 
-    Rules:
-    * tokens are separated by anything that is not part of a number+unit
-      (spaces, ``;``, ``/``, ``+``, or ``", "`` — a comma *followed by a space*);
-    * ``,`` or ``.`` directly between digits is a decimal separator;
-    * a bare number below 10 is read as kg (``0,5`` → 500 g), otherwise as g.
 
-    Raises InventoryError if the text contains anything that is not a weight.
+def _coerce_amounts(values: Any) -> list[Amount]:
+    """Text (``"300 4 0,5kg"``) or a list of numbers/strings → one Amount per piece.
+
+    Numbers in a list follow the same rule as text (below 10 = portions).
     """
-    if not isinstance(text, str):
-        raise InventoryError("invalid_weight", "Weights must be text")
-    lowered = text.casefold()
-    weights: list[int] = []
-    pos = 0
-    for match in _WEIGHT_RE.finditer(lowered):
-        gap = lowered[pos : match.start()]
-        if gap.strip(" \t;/+,") != "":
-            raise InventoryError("invalid_weight", f"Cannot parse weights {text!r}")
-        number = float(match.group(1).replace(",", "."))
-        unit = match.group(2)
-        if unit is None:
-            unit = "kg" if number < 10 else "g"
-        weights.append(validate_weight(round(number * _UNIT_FACTOR[unit])))  # type: ignore[arg-type]
-        pos = match.end()
-    if lowered[pos:].strip(" \t;/+,") != "":
-        raise InventoryError("invalid_weight", f"Cannot parse weights {text!r}")
-    return weights
-
-
-def _coerce_weights(weights: Any) -> list[int]:
-    if weights is None:
+    if values is None:
         return []
-    if isinstance(weights, str):
-        return parse_weights(weights)
-    if isinstance(weights, Iterable):
+    if isinstance(values, str):
+        return parse_amounts(values)
+    if isinstance(values, Iterable):
         result = []
-        for w in weights:
-            v = validate_weight(w)
-            if v is None:
-                raise InventoryError("invalid_weight", "Empty weight in list")
-            result.append(v)
+        for v in values:
+            amount = parse_amount(str(v)) if not isinstance(v, bool) else None
+            if amount is None or amount is UNKNOWN:
+                raise InventoryError("invalid_amount", f"Invalid value {v!r} in list")
+            result.append(amount)
         return result
-    raise InventoryError("invalid_weight", "Weights must be a list or text")
+    raise InventoryError("invalid_amount", "Amounts must be a list or text")
+
+
+def _piece_amount(raw: Mapping[str, Any]) -> Amount:
+    """Amount of a piece given as ``amount`` (text, parsed) or ``weight_g``/``portions``."""
+    if raw.get("amount") not in (None, ""):
+        return parse_amount(str(raw["amount"]))
+    return Amount(
+        weight_g=validate_weight(raw.get("weight_g")), portions=validate_portions(raw.get("portions"))
+    )
 
 
 def _parse_dt(value: Any) -> datetime:
@@ -208,16 +286,31 @@ class Piece:
     id: str
     added_at: datetime
     weight_g: int | None = None
+    portions: int | None = None
+
+    def __post_init__(self) -> None:
+        Amount(self.weight_g, self.portions)  # validates "not both"
+
+    @classmethod
+    def new(cls, piece_id: str, added_at: datetime, amount: Amount) -> Piece:
+        return cls(id=piece_id, added_at=added_at, weight_g=amount.weight_g, portions=amount.portions)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"id": self.id, "weight_g": self.weight_g, "added_at": self.added_at.isoformat()}
+        return {
+            "id": self.id,
+            "weight_g": self.weight_g,
+            "portions": self.portions,
+            "added_at": self.added_at.isoformat(),
+        }
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> Piece:
+        # "portions" is absent in data saved by 0.1.x/0.2.x: defaults to None
         return cls(
             id=str(data["id"]),
             added_at=_parse_dt(data["added_at"]),
             weight_g=validate_weight(data.get("weight_g")),
+            portions=validate_portions(data.get("portions")),
         )
 
 
@@ -245,6 +338,14 @@ class Item:
     @property
     def weighed_pieces(self) -> int:
         return sum(1 for p in self.pieces if p.weight_g is not None)
+
+    @property
+    def total_portions(self) -> int:
+        return sum(p.portions or 0 for p in self.pieces)
+
+    @property
+    def portioned_pieces(self) -> int:
+        return sum(1 for p in self.pieces if p.portions is not None)
 
     @property
     def oldest_added_at(self) -> datetime:
@@ -280,6 +381,8 @@ class Item:
             quantity=self.quantity,
             total_weight_g=self.total_weight_g,
             weighed_pieces=self.weighed_pieces,
+            total_portions=self.total_portions,
+            portioned_pieces=self.portioned_pieces,
             oldest_added_at=self.oldest_added_at.isoformat(),
         )
         return data
@@ -443,32 +546,33 @@ class Inventory:
     ) -> Item:
         """Create a new item. Never merges with existing items (decision D1).
 
-        ``weights`` (list or free text) defines one piece per weight; if given,
-        ``quantity`` must be omitted or equal to the number of weights.
-        Without weights, ``quantity`` pieces with unknown weight are created.
+        ``weights`` (list or free text, e.g. ``"300 0,5kg 4"``) defines one piece
+        per value: grams, or portions for bare numbers below 10 (see parse_amounts).
+        If given, ``quantity`` must be omitted or equal to the number of values.
+        Without it, ``quantity`` pieces with unknown amount are created.
         """
         name = normalize_name(name)
         category = normalize_category(category)
         note = normalize_note(note)
-        weight_list = _coerce_weights(weights)
+        amount_list = _coerce_amounts(weights)
 
-        if weight_list:
-            if quantity not in (None, len(weight_list)):
+        if amount_list:
+            if quantity not in (None, len(amount_list)):
                 raise InventoryError(
                     "quantity_weights_mismatch",
-                    f"Quantity {quantity} does not match {len(weight_list)} weights",
+                    f"Quantity {quantity} does not match {len(amount_list)} values",
                     quantity=quantity,
-                    weights=len(weight_list),
+                    weights=len(amount_list),
                 )
-            piece_weights: list[int | None] = list(weight_list)
+            piece_amounts: list[Amount] = list(amount_list)
         else:
             qty = 1 if quantity is None else quantity
             if isinstance(qty, bool) or not isinstance(qty, int) or not 1 <= qty <= QUANTITY_MAX:
                 raise InventoryError(
                     "invalid_quantity", f"Quantity must be 1-{QUANTITY_MAX}", max=QUANTITY_MAX
                 )
-            piece_weights = [None] * qty
-        if len(piece_weights) > QUANTITY_MAX:
+            piece_amounts = [UNKNOWN] * qty
+        if len(piece_amounts) > QUANTITY_MAX:
             raise InventoryError("invalid_quantity", f"Quantity must be 1-{QUANTITY_MAX}", max=QUANTITY_MAX)
 
         now = self._now_checked()
@@ -480,24 +584,33 @@ class Inventory:
             created_at=now,
             updated_at=now,
             created_by=user,
-            pieces=[Piece(id=self._new_id(), added_at=now, weight_g=w) for w in piece_weights],
+            pieces=[Piece.new(self._new_id(), now, a) for a in piece_amounts],
         )
         self.items[item.id] = item
         self._record("add_item", item.id, item.name, None, user, now, quantity=item.quantity)
         return item
 
-    def add_piece(self, item_id: str, weight_g: Any = None, *, user: str | None = None) -> Piece:
+    def add_piece(
+        self,
+        item_id: str,
+        weight_g: Any = None,
+        *,
+        portions: Any = None,
+        amount: Any = None,
+        user: str | None = None,
+    ) -> Piece:
+        """Add one piece dated now; amount as ``weight_g``, ``portions`` or text ``amount``."""
         item = self.get_item(item_id)
-        weight = validate_weight(weight_g)
+        value = _piece_amount({"weight_g": weight_g, "portions": portions, "amount": amount})
         if item.quantity >= QUANTITY_MAX:
             raise InventoryError("invalid_quantity", f"Quantity must be 1-{QUANTITY_MAX}", max=QUANTITY_MAX)
         now = self._now_checked()
         before = self._snapshot(item)
-        piece = Piece(id=self._new_id(), added_at=now, weight_g=weight)
+        piece = Piece.new(self._new_id(), now, value)
         item.pieces.append(piece)
         item.sort_pieces()
         item.updated_at = now
-        self._record("add_piece", item.id, item.name, before, user, now, weight_g=weight)
+        self._record("add_piece", item.id, item.name, before, user, now, piece=piece.to_dict())
         return piece
 
     def take_piece(self, item_id: str, piece_id: str | None = None, *, user: str | None = None) -> TakeResult:
@@ -536,8 +649,9 @@ class Inventory:
     ) -> Item:
         """Correct an item. ``pieces`` replaces the whole list:
 
-        * ``{"id": <existing>, "weight_g": ..., "added_at"?: ...}`` updates a piece
-          (omitted ``added_at`` keeps the original date);
+        * ``{"id": <existing>, "weight_g"|"portions"|"amount": ..., "added_at"?: ...}``
+          updates a piece (omitted ``added_at`` keeps the original date; ``amount``
+          is text parsed like add_item, e.g. ``"4"`` = 4 portions, ``"250"`` = 250 g);
         * an entry without ``id`` creates a new piece (``added_at`` defaults to now);
         * existing pieces not listed are removed.
         An empty list is rejected: use ``delete_item``.
@@ -562,7 +676,7 @@ class Inventory:
             for raw in pieces:
                 if not isinstance(raw, Mapping):
                     raise InventoryError("invalid_piece", "Each piece must be an object")
-                weight = validate_weight(raw.get("weight_g"))
+                value = _piece_amount(raw)
                 piece_id = raw.get("id")
                 if piece_id:
                     if piece_id in seen:
@@ -572,10 +686,10 @@ class Inventory:
                     seen.add(piece_id)
                     old = item.get_piece(piece_id)
                     added_at = _parse_dt(raw["added_at"]) if raw.get("added_at") else old.added_at
-                    new_pieces.append(Piece(id=old.id, added_at=added_at, weight_g=weight))
+                    new_pieces.append(Piece.new(old.id, added_at, value))
                 else:
                     added_at = _parse_dt(raw["added_at"]) if raw.get("added_at") else now
-                    new_pieces.append(Piece(id=self._new_id(), added_at=added_at, weight_g=weight))
+                    new_pieces.append(Piece.new(self._new_id(), added_at, value))
 
         before = self._snapshot(item)
         item.name, item.category, item.note = new_name, new_category, new_note
@@ -652,6 +766,7 @@ class Inventory:
             "total_items": len(self.items),
             "total_pieces": sum(i.quantity for i in self.items.values()),
             "total_weight_g": sum(i.total_weight_g for i in self.items.values()),
+            "total_portions": sum(i.total_portions for i in self.items.values()),
             "by_category": by_cat,
             "oldest_added_at": oldest.isoformat() if oldest else None,
         }

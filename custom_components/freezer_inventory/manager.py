@@ -63,7 +63,13 @@ class FreezerManager:
 
     @callback
     def op_add_piece(self, user: str | None, data: dict[str, Any]) -> dict[str, Any]:
-        piece = self.inventory.add_piece(data["item_id"], data.get("weight_g"), user=user)
+        piece = self.inventory.add_piece(
+            data["item_id"],
+            data.get("weight_g"),
+            portions=data.get("portions"),
+            amount=data.get("amount"),
+            user=user,
+        )
         self._changed()
         return {"item": self.inventory.get_item(data["item_id"]).to_view(), "piece": piece.to_dict()}
 

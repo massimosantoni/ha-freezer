@@ -26,6 +26,9 @@
           },
           "oldest_added_at": {
             "name": "Oldest piece"
+          },
+          "total_portions": {
+            "name": "Total portions"
           }
         }
       },
@@ -74,13 +77,13 @@
       "message": "The note cannot exceed 500 characters."
     },
     "invalid_weight": {
-      "message": "Invalid weight: use grams or kg between 1 g and 50 kg (e.g. \"200 300 0.5kg\")."
+      "message": "Invalid weight: must be between 1 g and 50 kg."
     },
     "invalid_quantity": {
       "message": "Quantity must be between 1 and 50."
     },
     "quantity_weights_mismatch": {
-      "message": "Quantity {quantity} does not match the number of weights ({weights})."
+      "message": "Quantity {quantity} does not match the number of values ({weights})."
     },
     "item_not_found": {
       "message": "Item not found (maybe already taken or deleted)."
@@ -92,7 +95,7 @@
       "message": "An item needs at least one piece: use \"Delete item\" to remove it."
     },
     "invalid_piece": {
-      "message": "Invalid piece list."
+      "message": "Invalid piece: give either a weight or portions, not both."
     },
     "invalid_date": {
       "message": "Invalid date."
@@ -105,6 +108,12 @@
     },
     "not_loaded": {
       "message": "Freezer Inventory is not loaded."
+    },
+    "invalid_amount": {
+      "message": "Invalid value: grams (e.g. 250, 0.5kg) or portions (whole number below 10, e.g. 4; above that write \"12 por\")."
+    },
+    "invalid_portions": {
+      "message": "Portions must be between 1 and 50."
     }
   },
   "selector": {
@@ -142,8 +151,8 @@
           "description": "Number of pieces without weight (ignored if weights are given)."
         },
         "weights": {
-          "name": "Weights",
-          "description": "Optional: one weight per piece, e.g. \"200 300 0.5kg\"."
+          "name": "Weights or portions",
+          "description": "Optional: one value per piece. Numbers from 10 up = grams (also 0.5kg), below 10 = portions; e.g. \"300 0.5kg 4\"."
         },
         "note": {
           "name": "Note",
@@ -161,7 +170,15 @@
         },
         "weight_g": {
           "name": "Weight",
-          "description": "Optional weight in grams."
+          "description": "Optional: weight in grams."
+        },
+        "portions": {
+          "name": "Portions",
+          "description": "Optional: number of portions in the piece."
+        },
+        "amount": {
+          "name": "Weight or portions (text)",
+          "description": "Optional, alternative to the two fields: \"250\", \"0.5kg\", \"4\" (portions), \"12 por\"."
         }
       }
     },
@@ -201,7 +218,7 @@
         },
         "pieces": {
           "name": "Pieces",
-          "description": "Replaces the list: pieces with \"id\" are updated, without \"id\" are created, unlisted ones are removed."
+          "description": "Replaces the list: pieces with \"id\" are updated, without \"id\" created, unlisted ones removed. Per piece \"amount\" (text, e.g. \"4\" or \"250\") or \"weight_g\"/\"portions\", plus optional \"added_at\"."
         }
       }
     },

@@ -21,31 +21,73 @@ def err_code(excinfo) -> str:
 # --------------------------------------------------------------------------- #
 
 
+Amount = inventory_mod.Amount
+parse_amounts = inventory_mod.parse_amounts
+
+
+def g(n):
+    return Amount(weight_g=n)
+
+
+def por(n):
+    return Amount(portions=n)
+
+
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
-        ("200 300 500", [200, 300, 500]),
-        ("200, 300; 500", [200, 300, 500]),
-        ("200g 300 gr", [200, 300]),
-        ("0,5kg", [500]),
-        ("0,5", [500]),  # bare number < 10 → kg
-        ("1.2 kg", [1200]),
-        ("1,5 KG", [1500]),
-        ("3hg", [300]),
-        ("1.200", [1200]),  # Italian thousands separator reads right by luck of the rule
-        ("250/250+250", [250, 250, 250]),
+        ("200 300 500", [g(200), g(300), g(500)]),
+        ("200, 300; 500", [g(200), g(300), g(500)]),
+        ("200g 300 gr", [g(200), g(300)]),
+        ("0,5kg", [g(500)]),
+        ("1.2 kg", [g(1200)]),
+        ("1,5 KG", [g(1500)]),
+        ("3hg", [g(300)]),
+        ("250/250+250", [g(250), g(250), g(250)]),
+        # bare number below 10 = portions
+        ("4 5", [por(4), por(5)]),
+        ("4", [por(4)]),
+        ("9", [por(9)]),
+        ("10", [g(10)]),
+        ("300 4 0,5kg", [g(300), por(4), g(500)]),
+        # explicit units override the rule
+        ("12 por", [por(12)]),
+        ("12por.", [por(12)]),
+        ("3 porzioni, 1 porzione", [por(3), por(1)]),
+        ("5g", [g(5)]),
         ("", []),
         ("   ", []),
     ],
 )
-def test_parse_weights_ok(text, expected):
-    assert parse_weights(text) == expected
+def test_parse_amounts_ok(text, expected):
+    assert parse_amounts(text) == expected
 
 
-@pytest.mark.parametrize("text", ["200 abc", "due etti", "200 lb", "0", "60kg", "-200"])
-def test_parse_weights_rejects_garbage(text):
+@pytest.mark.parametrize(
+    ("text", "code"),
+    [
+        ("200 abc", "invalid_amount"),
+        ("due etti", "invalid_amount"),
+        ("200 lb", "invalid_amount"),
+        ("-200", "invalid_amount"),
+        ("0,5", "invalid_amount"),  # was 500 g before 0.3.0: now ambiguous → rejected
+        ("1.200", "invalid_amount"),
+        ("2,5 por", "invalid_amount"),
+        ("0", "invalid_portions"),
+        ("60 por", "invalid_portions"),
+        ("60kg", "invalid_weight"),
+    ],
+)
+def test_parse_amounts_rejects(text, code):
     with pytest.raises(InventoryError) as exc:
-        parse_weights(text)
+        parse_amounts(text)
+    assert err_code(exc) == code
+
+
+def test_parse_weights_still_weights_only():
+    assert parse_weights("200 0,5kg") == [200, 500]
+    with pytest.raises(InventoryError) as exc:
+        parse_weights("200 4")
     assert err_code(exc) == "invalid_weight"
 
 
@@ -413,3 +455,80 @@ def test_naive_clock_rejected(ids):
     inv = Inventory(now=lambda: datetime(2026, 1, 1), new_id=ids)
     with pytest.raises(RuntimeError):
         inv.add_item("Bistecche", "carne")
+
+
+# --------------------------------------------------------------------------- #
+# portions (0.3.0)
+# --------------------------------------------------------------------------- #
+
+
+def test_add_item_with_portions_and_weights(inv):
+    item = inv.add_item("Carne da spiedo", "carne", weights="4 5")
+    assert [(p.weight_g, p.portions) for p in item.pieces] == [(None, 4), (None, 5)]
+    assert item.total_portions == 9 and item.portioned_pieces == 2
+    assert item.total_weight_g == 0 and item.weighed_pieces == 0
+    mixed = inv.add_item("Misto", "altro", weights=[300, 4, "0,5kg"])
+    assert [(p.weight_g, p.portions) for p in mixed.pieces] == [(300, None), (None, 4), (500, None)]
+    view = mixed.to_view()
+    assert (view["total_weight_g"], view["total_portions"]) == (800, 4)
+    assert view["pieces"][1] == {
+        "id": mixed.pieces[1].id,
+        "weight_g": None,
+        "portions": 4,
+        "added_at": mixed.pieces[1].added_at.isoformat(),
+    }
+    s = inv.summary()
+    assert (s["total_weight_g"], s["total_portions"]) == (800, 13)
+
+
+def test_add_piece_with_portions(inv):
+    item = inv.add_item("Carne da spiedo", "carne", weights="4")
+    assert inv.add_piece(item.id, portions=5).portions == 5
+    assert inv.add_piece(item.id, amount="3").portions == 3
+    assert inv.add_piece(item.id, amount="350").weight_g == 350
+    assert inv.add_piece(item.id, weight_g=5).weight_g == 5  # explicit field: no portion rule
+    with pytest.raises(InventoryError) as exc:
+        inv.add_piece(item.id, weight_g=300, portions=2)
+    assert err_code(exc) == "invalid_piece"
+
+
+def test_update_piece_amount_text(inv):
+    item = inv.add_item("Spiedo", "carne", weights="300 4")
+    p300, p4 = item.pieces
+    inv.update_item(
+        item.id,
+        pieces=[{"id": p300.id, "amount": "5"}, {"id": p4.id, "amount": "450"}, {"amount": "12 por"}],
+    )
+    assert [(p.weight_g, p.portions) for p in item.pieces] == [(None, 5), (450, None), (None, 12)]
+    inv.update_item(item.id, pieces=[{"id": p300.id, "amount": ""}])  # cleared → unknown
+    assert (item.pieces[0].weight_g, item.pieces[0].portions) == (None, None)
+
+
+def test_legacy_data_without_portions_loads(clock, ids):
+    legacy = {
+        "version": 1,
+        "items": {
+            "a": {
+                "id": "a",
+                "name": "Bistecche",
+                "category": "carne",
+                "note": "",
+                "created_at": "2026-10-31T18:00:00+01:00",
+                "updated_at": "2026-10-31T18:00:00+01:00",
+                "created_by": None,
+                "pieces": [{"id": "p", "weight_g": 300, "added_at": "2026-10-31T18:00:00+01:00"}],
+            }
+        },
+        "log": [],
+    }
+    inv = Inventory(legacy, now=clock, new_id=ids)
+    piece = inv.items["a"].pieces[0]
+    assert (piece.weight_g, piece.portions) == (300, None)
+    assert inv.to_dict()["items"]["a"]["pieces"][0]["portions"] is None
+
+
+def test_undo_restores_portions(inv):
+    item = inv.add_item("Spiedo", "carne", weights="4 5")
+    inv.take_piece(item.id)
+    inv.undo_last()
+    assert [p.portions for p in inv.items[item.id].pieces] == [4, 5]

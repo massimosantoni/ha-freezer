@@ -68,6 +68,7 @@ class FreezerSensor(SensorEntity):
             attrs = {
                 "items": summary["total_items"],
                 "total_weight_g": summary["total_weight_g"],
+                "total_portions": summary["total_portions"],
                 "oldest_added_at": summary["oldest_added_at"],
             }
         else:

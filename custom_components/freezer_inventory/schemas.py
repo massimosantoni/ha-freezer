@@ -15,19 +15,24 @@ from .const import QUANTITY_MAX, SORT_KEYS
 ITEM_ID = "item_id"
 
 _WEIGHT = vol.Any(None, vol.Coerce(int))
+_PORTIONS = vol.Any(None, vol.Coerce(int))
+# free text for one piece: "250", "0,5kg", "4" (portions), "12 por"
+_AMOUNT = vol.Any(None, cv.string)
 
 ADD_ITEM = {
     vol.Required("name"): cv.string,
     vol.Required("category"): cv.string,
     vol.Optional("quantity"): vol.All(vol.Coerce(int), vol.Range(min=1, max=QUANTITY_MAX)),
-    # list of grams or free text such as "200 300 0,5kg"
-    vol.Optional("weights"): vol.Any([vol.Coerce(int)], cv.string),
+    # one value per piece, list or free text: "300 0,5kg 4" (bare numbers < 10 = portions)
+    vol.Optional("weights"): vol.Any([vol.Any(vol.Coerce(int), cv.string)], cv.string),
     vol.Optional("note"): vol.Any(None, cv.string),
 }
 
 ADD_PIECE = {
     vol.Required(ITEM_ID): cv.string,
     vol.Optional("weight_g"): _WEIGHT,
+    vol.Optional("portions"): _PORTIONS,
+    vol.Optional("amount"): _AMOUNT,
 }
 
 TAKE_PIECE = {
@@ -39,6 +44,8 @@ PIECE = vol.Schema(
     {
         vol.Optional("id"): vol.Any(None, cv.string),
         vol.Optional("weight_g"): _WEIGHT,
+        vol.Optional("portions"): _PORTIONS,
+        vol.Optional("amount"): _AMOUNT,
         vol.Optional("added_at"): vol.Any(None, cv.string),
     }
 )
